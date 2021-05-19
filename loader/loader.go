@@ -1,14 +1,12 @@
 package loader
 
 import (
-	"context"
 	"fmt"
 	"github.com/DFilyushin/gobooklibrary/book"
 	"github.com/DFilyushin/gobooklibrary/database"
 	"github.com/DFilyushin/gobooklibrary/extractors"
 	"github.com/DFilyushin/gobooklibrary/models"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"golang.org/x/sync/semaphore"
 	"io/fs"
 	"log"
 	"path/filepath"
@@ -98,16 +96,16 @@ func checkBookExists(bookId string) (bool, error) {
 	return mongoBook != nil, nil
 }
 
-func ProcessBook(book book.Book) error {
+func ProcessBook(book book.Book) (*models.BookModel, error) {
 	/*
 		Checking existing book, adding
 	*/
 	isExists, err := checkBookExists(book.BookId)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if isExists {
-		return nil
+		return nil, nil
 	}
 
 	authors := getAuthors(book.Authors)
@@ -133,45 +131,63 @@ func ProcessBook(book book.Book) error {
 		Series:    book.Series,
 		SerialNum: book.SerialNum,
 	}
-	_, err = database.AddBook(newBook)
-	return err
+	//_, err = database.AddBook(newBook)
+	return newBook, err
 }
 
 func processBooks(books *[]book.Book) (int, int) {
 	/*
 		Process list of books with error handling
 	*/
-	//var err error
-	//var wg sync.WaitGroup
-	var ctx = context.TODO()
-	var sem = semaphore.NewWeighted(maxWorkers)
+	//var ctx = context.TODO()
+	//var sem = semaphore.NewWeighted(maxWorkers)
+	var wg sync.WaitGroup
+	bChannel := make(chan models.BookModel, 1000)
+	//booksBatch := make([]models.BookModel, 0)
 	countBooks := len(*books)
 	countError := 0
 
-	for _, bookItem := range *books {
-		//wg.Add(1)
 
-		if err := sem.Acquire(ctx, 1); err != nil {
-			log.Printf("Failed to acquire semaphore: %v", err)
-			break
-		}
+	for _, bookItem := range *books {
+		wg.Add(1)
+		//if err := sem.Acquire(ctx, 1); err != nil {
+		//	log.Printf("Failed to acquire semaphore: %v", err)
+		//	break
+		//}
 
 		go func(item book.Book) {
-			//defer wg.Done()
-			defer sem.Release(1)
-
-			err := ProcessBook(item)
+			//defer sem.Release(1)
+			defer wg.Done()
+			newBook, err := ProcessBook(item)
 			if err != nil {
 				fmt.Printf("Error adding book %s. Error message: %s\n", item.BookId, err)
 			}
+			if newBook != nil {
+				bChannel <- *newBook
+			}
 		}(bookItem)
-		//fmt.Println(runtime.NumGoroutine())
 	}
-	//wg.Wait()
 
-	if err := sem.Acquire(ctx, int64(maxWorkers)); err != nil {
-		log.Printf("Failed to acquire semaphore: %v", err)
+	go func() {
+		wg.Wait()
+		close(bChannel)
+	}()
+
+
+	for item := range bChannel {
+		fmt.Println(item)
+		//booksBatch = append(booksBatch, item)
+		//if len(booksBatch) == 100 {
+		//	//database.AddBooks()
+		//	fmt.Println(booksBatch)
+		//	fmt.Println("100")
+		//	booksBatch = booksBatch[:0]
+		//}
 	}
+
+	//if err := sem.Acquire(ctx, int64(maxWorkers)); err != nil {
+	//	log.Printf("Failed to acquire semaphore: %v", err)
+	//}
 	return countBooks - countError, countError
 }
 

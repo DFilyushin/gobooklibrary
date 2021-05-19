@@ -78,3 +78,11 @@ func AddBook(book *models.BookModel) (*primitive.ObjectID, error) {
 	value := result.InsertedID.(primitive.ObjectID)
 	return &value, nil
 }
+
+func AddBooks(books []interface{}) error {
+	_, err := Db.Collection("books").InsertMany(DbContext, books)
+	if err != nil {
+		return err
+	}
+	return nil
+}
