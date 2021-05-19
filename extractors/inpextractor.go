@@ -1,4 +1,4 @@
-package extractor
+package extractors
 
 import (
 	"bufio"
@@ -42,15 +42,17 @@ func getKeywordsByString(keysLine string) []string {
 
 func processLine(line string) (*book.Book, error) {
 	data := strings.Split(line, ItemSeparatorInLine)
-	authorLine, genres, title, series, serNum, fileName, _, bookId, bookDeleted, _, bookAdded, language, rate, keywords :=
+	authorLine, genreLine, title, series, serNum, fileName, _, bookId, bookDeleted, _, bookAdded, language, rate, keywords :=
 		data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7], data[8], data[9], data[10], data[11], data[12], data[13]
 
 	authors := getAuthorsByString(authorLine)
+	genres := strings.Split(genreLine, ArraySeparator)
+	genres = genres[:len(genres)-1]
 
 	return &book.Book{
 		BookId:    bookId,
 		Authors:   authors,
-		Genres:    strings.Split(genres, ArraySeparator),
+		Genres:    genres,
 		BookName:  title,
 		Series:    series,
 		SerialNum: serNum,

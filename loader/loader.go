@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"github.com/DFilyushin/gobooklibrary/book"
 	"github.com/DFilyushin/gobooklibrary/database"
-	"github.com/DFilyushin/gobooklibrary/extractor"
+	"github.com/DFilyushin/gobooklibrary/extractors"
 	"github.com/DFilyushin/gobooklibrary/models"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"golang.org/x/sync/semaphore"
@@ -176,7 +176,7 @@ func processBooks(books *[]book.Book) (int, int) {
 }
 
 func ProcessIndexFile(fileName string) {
-	books, err := extractor.ProcessIndexFile(fileName)
+	books, err := extractors.ProcessIndexFile(fileName)
 	if err != nil {
 		fmt.Printf("Error processing file %s. Error message: %v\n", fileName, err)
 	} else {
@@ -223,7 +223,7 @@ func ProcessIndexPath(path string, ignoreFiles []string) []string {
 
 	books := make([]book.Book, 0)
 	for _, fileName := range files {
-		books, err = extractor.ProcessIndexFile(fileName)
+		books, err = extractors.ProcessIndexFile(fileName)
 		if err != nil {
 			fmt.Printf("Error processing file %s. Error message: %v\n", path, err)
 		} else {
