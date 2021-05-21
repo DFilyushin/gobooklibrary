@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	"fmt"
 	"github.com/DFilyushin/gobooklibrary/models"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -26,13 +27,27 @@ func SetupDatabase(conString string, databaseName string)  {
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	//err = DbClient.Ping(DbContext, readpref.Primary())
-	//if err != nil {
-	//	panic("Mongo unavailable...")
-	//}
-
 	Db = DbClient.Database(databaseName)
+
+	createIndexes()
+}
+
+func createIndexes()  {
+	err := addIndex("books", []string{"filename"})
+	if err != nil {
+		fmt.Printf("Error creating index:  %v", err)
+	}
+}
+
+func addIndex(collectionName string, fields []string) error {
+	var bsonValue = make(bson.M)
+	for _, name:= range fields {
+		bsonValue[name] = 1
+	}
+	_, err := Db.Collection(collectionName).Indexes().CreateOne(DbContext, mongo.IndexModel{
+		Keys: bsonValue,
+	})
+	return err
 }
 
 func GetBookById(id string) (*models.BookModel, error) {
@@ -79,8 +94,12 @@ func AddBook(book *models.BookModel) (*primitive.ObjectID, error) {
 	return &value, nil
 }
 
-func AddBooks(books []interface{}) error {
-	_, err := Db.Collection("books").InsertMany(DbContext, books)
+func AddBooks(books []models.BookModel) error {
+	items := make([]interface{}, 0)
+	for _, item := range books {
+		items = append(items, item)
+	}
+	_, err := Db.Collection("books").InsertMany(DbContext, items)
 	if err != nil {
 		return err
 	}

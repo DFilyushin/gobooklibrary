@@ -15,7 +15,7 @@ import (
 )
 
 const IndexFileExtension = ".inp"
-
+const maxBatchSize = 1000
 const maxWorkers = 30000
 
 type AuthorCache map[book.Author]primitive.ObjectID
@@ -143,17 +143,12 @@ func processBooks(books *[]book.Book) (int, int) {
 	//var sem = semaphore.NewWeighted(maxWorkers)
 	var wg sync.WaitGroup
 	bChannel := make(chan models.BookModel, 1000)
-	//booksBatch := make([]models.BookModel, 0)
+	booksBatch := make([]models.BookModel, 0)
 	countBooks := len(*books)
 	countError := 0
 
-
 	for _, bookItem := range *books {
 		wg.Add(1)
-		//if err := sem.Acquire(ctx, 1); err != nil {
-		//	log.Printf("Failed to acquire semaphore: %v", err)
-		//	break
-		//}
 
 		go func(item book.Book) {
 			//defer sem.Release(1)
@@ -173,21 +168,21 @@ func processBooks(books *[]book.Book) (int, int) {
 		close(bChannel)
 	}()
 
-
 	for item := range bChannel {
-		fmt.Println(item)
-		//booksBatch = append(booksBatch, item)
-		//if len(booksBatch) == 100 {
-		//	//database.AddBooks()
-		//	fmt.Println(booksBatch)
-		//	fmt.Println("100")
-		//	booksBatch = booksBatch[:0]
-		//}
+		if len(booksBatch) == maxBatchSize {
+			err := database.AddBooks(booksBatch)
+			if err != nil {
+				fmt.Printf("Error batch adding books. Error message: %v\n", err)
+			}
+			booksBatch = booksBatch[:0]
+		}
+		booksBatch = append(booksBatch, item)
+	}
+	err := database.AddBooks(booksBatch)
+	if err != nil {
+		fmt.Printf("Error batch adding books. Error message: %v\n", err)
 	}
 
-	//if err := sem.Acquire(ctx, int64(maxWorkers)); err != nil {
-	//	log.Printf("Failed to acquire semaphore: %v", err)
-	//}
 	return countBooks - countError, countError
 }
 
