@@ -42,7 +42,7 @@ func loadIndexFiles(ignoreEarlyProcessedFiles bool) {
 }
 
 func loadIndexFile(fileName string)  {
-	loader.ProcessIndexFile(fileName)
+	loader.ProcessFbFile(fileName)
 }
 
 func main()  {
@@ -51,8 +51,8 @@ func main()  {
 	database.SetupDatabase(mongoConnectionString, mongoDatabase)
 
 	start := time.Now()
-	loadIndexFiles(processIgnoreFile)
-	//loadIndexFile(indexFileName)
+	//loadIndexFiles(processIgnoreFile)
+	loadIndexFile("C:\\var\\library\\data\\91846.fb2")
 	duration := time.Since(start)
 
 	log.Println("Duration loading:", duration)

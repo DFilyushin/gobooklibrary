@@ -3,47 +3,113 @@ package extractors
 import (
 	"encoding/xml"
 	"fmt"
+	"github.com/DFilyushin/gobooklibrary/helpers"
+	"golang.org/x/net/html/charset"
 	"io"
 	"os"
+	"strings"
 )
 
-type Book struct {
-	Description  string `xml:"description"`
-	Body string `xml:"body"`
-	Binary []string `xml:"binary"`
-}
+const CoverTag = "coverpage"
+const ImageTag = "image"
+const BinaryTag = "binary"
 
-func parseFb2File(fileName string)  {
+func ExtractImageFromFb2(fileName string) (string, error) {
 	f, err := os.Open(fileName)
 	if err != nil {
-		panic(err)
+		return "", err
 	}
 
 	defer f.Close()
 
 	decoder := xml.NewDecoder(f)
-	books := make([]Book, 0)
+	decoder.CharsetReader = charset.NewReaderLabel
 
-	var stack []string
+	var processed bool
+	var processedBinary bool
+	var tagValue string
+	var coverFileName string
+
 	for {
 		tok, err := decoder.Token()
 		if err == io.EOF {
 			break
-		}else if err != nil {
-			fmt.Fprintf(os.Stderr, "xmlselect: %v\n", err)
-			os.Exit(1)
+		} else if err != nil {
+			return "", err
 		}
+
 		switch tok := tok.(type) {
 		case xml.StartElement:
-			stack = append(stack, tok.Name.Local)
+			if tok.Name.Local == CoverTag {
+				processed = true
+			}
+			if tok.Name.Local == ImageTag && processed {
+				coverFileName = tok.Attr[0].Value[1:]
+			}
+			if tok.Name.Local == BinaryTag {
+				for _, item := range tok.Attr {
+					if item.Name.Local == "id" && item.Value == coverFileName {
+						processedBinary = true
+					}
+				}
+			}
 		case xml.EndElement:
-			stack = stack[:len(stack)-1]
+			if tok.Name.Local == CoverTag {
+				processed = false
+			}
 		case xml.CharData:
-			if len(stack) > 0 {
-				message := stack[len(stack)-1:]
-				fmt.Printf("%s: %s\n", message, tok)
+			if processedBinary {
+				tagValue = string(tok)
+				fmt.Println(tagValue)
+				processedBinary = false
 			}
 		}
 	}
-	fmt.Println(books)
+
+	return "", nil
+}
+
+func ParseFb2File(fileName string, tags []string) (map[string]string, error) {
+	result := make(map[string]string)
+
+	f, err := os.Open(fileName)
+	if err != nil {
+		return nil, err
+	}
+
+	defer f.Close()
+
+	decoder := xml.NewDecoder(f)
+	decoder.CharsetReader = charset.NewReaderLabel
+
+	var tagValues []string
+	var tagOpened bool
+	var tagValue string
+
+	for {
+		tok, err := decoder.Token()
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			return nil, err
+		}
+		switch tok := tok.(type) {
+		case xml.StartElement:
+			if helpers.CheckItemInArray(tok.Name.Local, &tags) {
+				tagValues = tagValues[:0] //clear storage
+				tagOpened = true
+			}
+		case xml.EndElement:
+			if helpers.CheckItemInArray(tok.Name.Local, &tags) {
+				result[tok.Name.Local] = strings.Join(tagValues, " ")
+				tagOpened = false
+			}
+		case xml.CharData:
+			if tagOpened {
+				tagValue = string(tok)
+				tagValues = append(tagValues, strings.TrimSpace(tagValue))
+			}
+		}
+	}
+	return result, nil
 }

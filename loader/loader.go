@@ -5,6 +5,7 @@ import (
 	"github.com/DFilyushin/gobooklibrary/book"
 	"github.com/DFilyushin/gobooklibrary/database"
 	"github.com/DFilyushin/gobooklibrary/extractors"
+	"github.com/DFilyushin/gobooklibrary/helpers"
 	"github.com/DFilyushin/gobooklibrary/models"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"io/fs"
@@ -23,14 +24,7 @@ type AuthorCache map[book.Author]primitive.ObjectID
 var authorCache = make(AuthorCache)
 var mu sync.RWMutex
 
-func checkItemInArray(item string, arr *[]string) bool {
-	for _, arrItem := range *arr {
-		if arrItem == item {
-			return true
-		}
-	}
-	return false
-}
+
 
 func getAuthors(authors []book.Author) []primitive.ObjectID {
 	/*
@@ -195,6 +189,18 @@ func ProcessIndexFile(fileName string) {
 	}
 }
 
+func ProcessFbFile(fileName string)  {
+	var tags = []string {"genre", "annotation", "coverpage", "image"}
+
+	extractors.ExtractImageFromFb2(fileName)
+
+	value, err := extractors.ParseFb2File(fileName, tags)
+	if err != nil {
+		fmt.Println(err)
+	}
+	fmt.Println(value)
+}
+
 func getFileFromPath(path string, ignoreFiles []string) ([]string, error) {
 	/*
 		Walk directory, find .inp files for processing
@@ -207,7 +213,7 @@ func getFileFromPath(path string, ignoreFiles []string) ([]string, error) {
 		}
 		if !info.IsDir() && filepath.Ext(path) == IndexFileExtension {
 			fileName := filepath.Base(path)
-			if !checkItemInArray(fileName, &ignoreFiles) {
+			if !helpers.CheckItemInArray(fileName, &ignoreFiles) {
 				files = append(files, path)
 			}
 		}
@@ -242,7 +248,7 @@ func ProcessIndexPath(path string, ignoreFiles []string) []string {
 			processBooks(&books)
 			duration := time.Since(start)
 			log.Printf("Duration loading file %s: %v", fileName, duration)
-			processedFiles = append(processedFiles, fileName)
+			processedFiles = append(processedFiles, filepath.Base(fileName))
 		}
 	}
 	return processedFiles
